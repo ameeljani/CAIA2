@@ -11,7 +11,7 @@ ALLOWED_MODELS = [
     "meta-llama/Llama-3.2-1B-Instruct",
     "meta-llama/Llama-3.2-3B-Instruct",
 ]
-MODEL_ID = "meta-llama/Llama-3.2-1B-Instruct"
+MODEL_ID = "meta-llama/Llama-3.2-3B-Instruct"
 
 
 

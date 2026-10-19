@@ -148,22 +148,7 @@ def train_loop(model, tokenizer, dataset) -> None:
         collate_fn=collate_fn
     )
 
-    for example in tokenized_dataset:
-        batch = next(iter(train_loader))
-        labels = batch["labels"]
-        input_ids = batch["input_ids"]
-        attention_mask = batch["attention_mask"]
-        lsize = labels.size()
-        inputsize = input_ids.size()
-        attnsize = attention_mask.size()
-        has_zero = (attention_mask == 0).any().item()
 
-        assert torch.all(
-            (labels == -100) | (labels == input_ids)
-        ), "Labels do not match input IDs!"
-
-        assert (labels[1:] != -100).any(), \
-            "No supervised next-token targets!"
 
 
     '''init optimizer'''
