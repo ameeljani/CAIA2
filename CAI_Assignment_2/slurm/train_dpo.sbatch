@@ -21,7 +21,7 @@
 #SBATCH --error=slurm/logs/%x-%A_%a.err
 
 module load anaconda3
-conda activate CAI_A2
+conda activate /home/hice1/ajani30/scratch/conda/envs/CAI_A2
 
 BETAS=(0.05 0.1 0.5)
 BETA=${BETAS[$SLURM_ARRAY_TASK_ID]}

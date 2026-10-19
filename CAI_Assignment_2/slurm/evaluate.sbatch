@@ -20,6 +20,6 @@
 #SBATCH --error=slurm/logs/%x-%j.err
 
 module load anaconda3
-conda activate CAI_A2
+conda activate /home/hice1/ajani30/scratch/conda/envs/CAI_A2
 
 python evaluate.py
