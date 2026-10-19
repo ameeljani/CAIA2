@@ -37,4 +37,40 @@ def tokenize_with_response_mask(messages: list[dict], tokenizer, max_seq_len: in
     starts in the full conversation's tokenization -- everything before that index is
     prompt, everything from it onward (up to the end-of-turn token) is response.
     """
-    raise NotImplementedError("Implement tokenization + response masking.")
+
+    '''full tokenized conversation'''
+    text_all = tokenizer.apply_chat_template(messages, tokenize=True,add_generation_prompt=False)
+    input_text = torch.tensor(text_all[:max_seq_len],dtype=torch.long)
+    input_length = len(input_text)
+
+    '''Debugging stmt'''
+    input_list = input_text.tolist()
+
+    '''attention mask'''
+    tensor_ones = torch.ones(input_length, dtype=torch.long)
+
+    '''Debugging stmt'''
+    attnmask_list = tensor_ones.tolist()
+
+    '''response mask'''
+    text_excludingprompt = tokenizer.apply_chat_template(messages[:-1], tokenize=True,add_generation_prompt=True)
+    where_response_starts = len(text_excludingprompt)
+    resp_mask = torch.zeros(input_length, dtype=torch.long)
+    resp_mask[where_response_starts:] = 1
+
+    '''Debugging stmt'''
+    respmask_list = resp_mask.tolist()
+
+    '''Output'''
+    output = {'input_ids': input_text, 'attention_mask': tensor_ones, 'response_mask': resp_mask}
+    return output
+
+
+
+
+
+
+
+
+
+

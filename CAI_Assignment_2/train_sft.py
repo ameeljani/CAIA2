@@ -32,6 +32,8 @@ from configs.train_config import (
 from data_loader import load_sft_examples
 from utils.model_utils import load_tokenizer, load_base_model
 from utils.masking_utils import tokenize_with_response_mask
+from torch.utils.data import DataLoader
+from torch.nn.utils.rnn import pad_sequence
 
 
 def build_model_and_tokenizer():
@@ -75,6 +77,8 @@ def build_sft_example(messages: list[dict], tokenizer, max_seq_len: int = SFT_MA
     }
 
 
+
+
 def train_loop(model, tokenizer, dataset) -> None:
     """
     Implements the Part A SFT training loop.
@@ -93,7 +97,123 @@ def train_loop(model, tokenizer, dataset) -> None:
     Hyperparameters (SFT_BATCH_SIZE, SFT_EPOCHS, SFT_LEARNING_RATE, SFT_MAX_SEQ_LEN) are
     in configs/train_config.py -- yours to tune, not fixed by this skeleton.
     """
-    raise NotImplementedError("Implement the Part A SFT training loop.")
+
+    '''Collator function'''
+
+    def collate_fn(batch):
+        input_ids = pad_sequence([x["input_ids"] for x in batch], batch_first=True,
+                                 padding_value=tokenizer.pad_token_id)
+
+        attention_mask = pad_sequence(
+            [x["attention_mask"] for x in batch],
+            batch_first=True,
+            padding_value=0
+        )
+
+        labels = pad_sequence(
+            [x["labels"] for x in batch],
+            batch_first=True,
+            padding_value=-100
+        )
+
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels
+        }
+
+    '''check tokenizer'''
+    #tokenizer.padding_side = "left"
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    '''preprocessing loop'''
+    tokenized_dataset = dataset.map(
+        lambda example: build_sft_example(example['messages'], tokenizer),
+        remove_columns=dataset.column_names
+    )
+    tokenized_dataset.set_format(
+        type="torch",
+        columns=["input_ids", "attention_mask", "labels"]
+    )
+
+    '''split into batches'''
+    batch_size = SFT_BATCH_SIZE
+    learning_rate = SFT_LEARNING_RATE
+
+    train_loader = DataLoader(
+        tokenized_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=collate_fn
+    )
+
+    for example in tokenized_dataset:
+        batch = next(iter(train_loader))
+        labels = batch["labels"]
+        input_ids = batch["input_ids"]
+        attention_mask = batch["attention_mask"]
+        lsize = labels.size()
+        inputsize = input_ids.size()
+        attnsize = attention_mask.size()
+        has_zero = (attention_mask == 0).any().item()
+
+        assert torch.all(
+            (labels == -100) | (labels == input_ids)
+        ), "Labels do not match input IDs!"
+
+        assert (labels[1:] != -100).any(), \
+            "No supervised next-token targets!"
+
+
+    '''init optimizer'''
+    optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],lr=learning_rate)
+
+    '''train loop'''
+    epochs = SFT_EPOCHS
+    epochs_store = []
+    losses_store = []
+    model.train()
+    '''device'''
+    device = model.get_input_embeddings().weight.device
+    for epoch in range(epochs):
+        epochs_store.append(epoch)
+        '''go through batches'''
+        running_loss = 0.0
+        print("Epoch" + str(epoch), flush = True)
+        for step, batch in enumerate(train_loader):
+            batch = {
+                key: value.to(device)
+                for key, value in batch.items()
+            }
+            optimizer.zero_grad()
+
+            '''forward pass '''
+            outputs = model(input_ids=batch["input_ids"],attention_mask=batch["attention_mask"],labels=batch["labels"])
+
+            '''compute loss, evidenly this is already built in as cross entropy'''
+            loss = outputs.loss
+
+            '''record loss'''
+            running_loss += loss.item()
+
+            '''backward pass'''
+            loss.backward()
+
+
+            '''optimizer step'''
+            optimizer.step()
+
+            '''Printing out status for batch training'''
+            if (step + 1) % 10 == 0:
+                print(f"Epoch {epoch + 1}/{SFT_EPOCHS}, "f"Step {step + 1}/{len(train_loader)}, "f"Loss: {loss.item():.4f}")
+
+        '''printing out status for the epoch itself'''
+        avg_epoch_loss = running_loss / len(train_loader)
+        print(
+            f"Epoch {epoch + 1} completed. "
+            f"Average Loss: {avg_epoch_loss:.4f}", flush=True
+        )
 
 
 def main() -> None:
@@ -121,3 +241,11 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
